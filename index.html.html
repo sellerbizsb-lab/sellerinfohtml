@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>토리1004 매출 분석 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* 배경 그라데이션 효과 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(255, 195, 42, 0.2) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, rgba(255, 119, 119, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        /* 헤더 섹션 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .header-left h1 {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, #8b92ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+        
+        .date-range {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* KPI 카드 */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .kpi-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .kpi-card.success::before {
+            background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+        }
+        
+        .kpi-card.warning::before {
+            background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+        }
+        
+        .kpi-card.danger::before {
+            background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+        }
+        
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .kpi-label {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+        
+        .kpi-trend {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .trend-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .trend-up {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .trend-down {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        /* 차트 컨테이너 */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+        }
+        
+        .chart-container.col-8 {
+            grid-column: span 8;
+        }
+        
+        .chart-container.col-4 {
+            grid-column: span 4;
+        }
+        
+        .chart-container.col-6 {
+            grid-column: span 6;
+        }
+        
+        .chart-container.col-12 {
+            grid-column: span 12;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .chart-badge {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        canvas {
+            max-height: 400px;
+        }
+        
+        /* 테이블 스타일 */
+        .data-table {
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .data-table thead {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .data-table th {
+            padding: 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .data-table td {
+            padding: 12px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .vendor-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .vendor-badge.naver {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .vendor-badge.coupang {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .vendor-badge.eleven {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .chart-container.col-8,
+            .chart-container.col-4,
+            .chart-container.col-6 {
+                grid-column: span 12;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+        }
+        
+        /* 애니메이션 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .kpi-card {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        .chart-container {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+        
+        .kpi-card:nth-child(1) { animation-delay: 0.1s; }
+        .kpi-card:nth-child(2) { animation-delay: 0.2s; }
+        .kpi-card:nth-child(3) { animation-delay: 0.3s; }
+        .kpi-card:nth-child(4) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <div class="header-left">
+                <h1>토리1004 매출 분석 대시보드</h1>
+                <p class="subtitle">E-Commerce Sales Analytics Platform</p>
+            </div>
+            <div class="date-range">
+                📅 2022.01 - 2024.12
+            </div>
+        </div>
+        
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon">💰</div>
+                <div class="kpi-label">Total Revenue</div>
+                <div class="kpi-value" id="totalRevenue">0</div>
+                <div class="kpi-trend">
+                    <span class="trend-icon trend-up">↑</span>
+                    <span>3년 누적 매출</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card success">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-label">Total Transactions</div>
+                <div class="kpi-value" id="totalTransactions">0</div>
+                <div class="kpi-trend">
+                    <span class="trend-icon trend-up">↑</span>
+                    <span>총 거래 건수</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card warning">
+                <div class="kpi-icon">📈</div>
+                <div class="kpi-label">Monthly Average</div>
+                <div class="kpi-value" id="avgMonthlyRevenue">0</div>
+                <div class="kpi-trend">
+                    <span>36개월 평균</span>
+                </div>
+            </div>
+            
+            <div class="kpi-card danger">
+                <div class="kpi-icon">🏆</div>
+                <div class="kpi-label">Peak Performance</div>
+                <div class="kpi-value" id="bestMonth">-</div>
+                <div class="kpi-trend" id="bestMonthValue">0</div>
+            </div>
+        </div>
+        
+        <div class="chart-grid">
+            <div class="chart-container col-8">
+                <div class="chart-header">
+                    <h3 class="chart-title">월별 매출 추이 분석</h3>
+                    <span class="chart-badge">3 Years Trend</span>
+                </div>
+                <canvas id="monthlyTrendChart"></canvas>
+            </div>
+            
+            <div class="chart-container col-4">
+                <div class="chart-header">
+                    <h3 class="chart-title">판매채널 점유율</h3>
+                    <span class="chart-badge">Market Share</span>
+                </div>
+                <canvas id="vendorPieChart"></canvas>
+            </div>
+            
+            <div class="chart-container col-6">
+                <div class="chart-header">
+                    <h3 class="chart-title">연도별 성과 비교</h3>
+                    <span class="chart-badge">YoY Growth</span>
+                </div>
+                <canvas id="yearlyComparisonChart"></canvas>
+            </div>
+            
+            <div class="chart-container col-6">
+                <div class="chart-header">
+                    <h3 class="chart-title">분기별 실적 추이</h3>
+                    <span class="chart-badge">Quarterly</span>
+                </div>
+                <canvas id="quarterlyChart"></canvas>
+            </div>
+            
+            <div class="chart-container col-12">
+                <div class="chart-header">
+                    <h3 class="chart-title">판매채널별 상세 분석</h3>
+                    <span class="chart-badge">Channel Performance</span>
+                </div>
+                <canvas id="vendorDetailChart"></canvas>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>순위</th>
+                            <th>판매채널</th>
+                            <th>총 매출액</th>
+                            <th>점유율</th>
+                            <th>상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vendorTableBody">
+                        <!-- 동적으로 생성됨 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Chart.js 기본 설정
+        Chart.defaults.color = 'rgba(255, 255, 255, 0.8)';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+        Chart.defaults.font.family = 'Pretendard';
+        
+        // 데이터 준비
+        const salesData = {
+            "2024-01": { sales: 63646742, count: 6451 },
+            "2024-02": { sales: 32051447, count: 4954 },
+            "2024-03": { sales: 39028254, count: 5375 },
+            "2024-04": { sales: 41703727, count: 5045 },
+            "2024-05": { sales: 39265987, count: 5130 },
+            "2024-06": { sales: 30981800, count: 3992 },
+            "2024-07": { sales: 30837771, count: 3757 },
+            "2024-08": { sales: 22902634, count: 3380 },
+            "2024-09": { sales: 22702900, count: 3290 },
+            "2024-10": { sales: 28525485, count: 3845 },
+            "2024-11": { sales: 26984856, count: 3866 },
+            "2024-12": { sales: 26126361, count: 3710 },
+            "2023-01": { sales: 69665264, count: 5842 },
+            "2023-02": { sales: 80525080, count: 8026 },
+            "2023-03": { sales: 79664400, count: 6652 },
+            "2023-04": { sales: 94249577, count: 8343 },
+            "2023-05": { sales: 53485477, count: 6845 },
+            "2023-06": { sales: 39009001, count: 4847 },
+            "2023-07": { sales: 47299514, count: 5095 },
+            "2023-08": { sales: 35196141, count: 4446 },
+            "2023-09": { sales: 41971679, count: 5657 },
+            "2023-10": { sales: 39492374, count: 5283 },
+            "2023-11": { sales: 45610127, count: 6397 },
+            "2023-12": { sales: 44120047, count: 6483 },
+            "2022-01": { sales: 54704387, count: 7814 },
+            "2022-02": { sales: 52763534, count: 6523 },
+            "2022-03": { sales: 53167846, count: 6918 },
+            "2022-04": { sales: 58297052, count: 7966 },
+            "2022-05": { sales: 49317924, count: 7621 },
+            "2022-06": { sales: 38176957, count: 5401 },
+            "2022-07": { sales: 41945752, count: 5695 },
+            "2022-08": { sales: 41109437, count: 4860 },
+            "2022-09": { sales: 36089118, count: 4807 },
+            "2022-10": { sales: 55684774, count: 6644 },
+            "2022-11": { sales: 59924557, count: 6091 },
+            "2022-12": { sales: 76576008, count: 7020 }
+        };
+        
+        const vendorData = {
+            "네이버파이낸셜": 1668201619,
+            "십일번가": 14046672,
+            "쿠팡": 9528246,
+            "인터파크": 554700,
+            "위메프": 391924,
+            "기타": 80830
+        };
+        
+        // KPI 계산
+        let totalRevenue = 0;
+        let totalTransactions = 0;
+        let bestMonth = '';
+        let bestMonthValue = 0;
+        
+        Object.entries(salesData).forEach(([month, data]) => {
+            totalRevenue += data.sales;
+            totalTransactions += data.count;
+            if (data.sales > bestMonthValue) {
+                bestMonthValue = data.sales;
+                bestMonth = month;
+            }
+        });
+        
+        const avgMonthlyRevenue = Math.round(totalRevenue / 36);
+        
+        // KPI 표시
+        document.getElementById('totalRevenue').textContent = '₩' + (totalRevenue / 100000000).toFixed(1) + '억';
+        document.getElementById('totalTransactions').textContent = totalTransactions.toLocaleString();
+        document.getElementById('avgMonthlyRevenue').textContent = '₩' + (avgMonthlyRevenue / 10000000).toFixed(1) + '천만';
+        document.getElementById('bestMonth').textContent = bestMonth;
+        document.getElementById('bestMonthValue').textContent = '₩' + (bestMonthValue / 10000000).toFixed(1) + '천만';
+        
+        // 차트 색상
+        const chartColors = {
+            primary: '#8b92ff',
+            secondary: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            purple: '#a78bfa',
+            pink: '#ec4899',
+            cyan: '#06b6d4',
+            grid: 'rgba(255, 255, 255, 0.05)'
+        };
+        
+        // 1. 월별 매출 추이
+        const monthlyLabels = Object.keys(salesData).sort();
+        const monthlyValues = monthlyLabels.map(month => salesData[month].sales);
+        
+        const gradientBg = document.getElementById('monthlyTrendChart').getContext('2d').createLinearGradient(0, 0, 0, 400);
+        gradientBg.addColorStop(0, 'rgba(139, 146, 255, 0.3)');
+        gradientBg.addColorStop(1, 'rgba(139, 146, 255, 0)');
+        
+        new Chart(document.getElementById('monthlyTrendChart'), {
+            type: 'line',
+            data: {
+                labels: monthlyLabels,
+                datasets: [{
+                    label: '월별 매출',
+                    data: monthlyValues,
+                    borderColor: chartColors.primary,
+                    backgroundColor: gradientBg,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: chartColors.primary
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 13 },
+                        callbacks: {
+                            label: function(context) {
+                                return '매출: ₩' + (context.parsed.y / 10000000).toFixed(1) + '천만';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: chartColors.grid },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        grid: { color: chartColors.grid },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₩' + (value / 100000000).toFixed(1) + '억';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 2. 판매채널 점유율
+        new Chart(document.getElementById('vendorPieChart'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(vendorData),
+                datasets: [{
+                    data: Object.values(vendorData),
+                    backgroundColor: [
+                        chartColors.primary,
+                        chartColors.secondary,
+                        chartColors.warning,
+                        chartColors.danger,
+                        chartColors.purple,
+                        chartColors.cyan
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + percentage + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 3. 연도별 성과
+        const yearlyData = {
+            2022: 0,
+            2023: 0,
+            2024: 0
+        };
+        
+        Object.entries(salesData).forEach(([month, data]) => {
+            const year = parseInt(month.split('-')[0]);
+            yearlyData[year] += data.sales;
+        });
+        
+        new Chart(document.getElementById('yearlyComparisonChart'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(yearlyData),
+                datasets: [{
+                    label: '연간 매출',
+                    data: Object.values(yearlyData),
+                    backgroundColor: [chartColors.purple, chartColors.primary, chartColors.secondary],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                return '₩' + (context.parsed.y / 100000000).toFixed(1) + '억';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: {
+                        grid: { color: chartColors.grid },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₩' + (value / 100000000).toFixed(0) + '억';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 4. 분기별 실적
+        const quarterlyData = {};
+        Object.entries(salesData).forEach(([month, data]) => {
+            const [year, monthNum] = month.split('-');
+            const quarter = Math.ceil(parseInt(monthNum) / 3);
+            const quarterKey = `${year} Q${quarter}`;
+            
+            if (!quarterlyData[quarterKey]) {
+                quarterlyData[quarterKey] = 0;
+            }
+            quarterlyData[quarterKey] += data.sales;
+        });
+        
+        new Chart(document.getElementById('quarterlyChart'), {
+            type: 'line',
+            data: {
+                labels: Object.keys(quarterlyData),
+                datasets: [{
+                    label: '분기별 매출',
+                    data: Object.values(quarterlyData),
+                    borderColor: chartColors.secondary,
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: chartColors.secondary
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                return '₩' + (context.parsed.y / 100000000).toFixed(1) + '억';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        grid: { color: chartColors.grid },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₩' + (value / 100000000).toFixed(0) + '억';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 5. 판매채널별 상세
+        new Chart(document.getElementById('vendorDetailChart'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(vendorData),
+                datasets: [{
+                    label: '매출액',
+                    data: Object.values(vendorData),
+                    backgroundColor: [
+                        chartColors.primary,
+                        chartColors.secondary,
+                        chartColors.warning,
+                        chartColors.danger,
+                        chartColors.purple,
+                        chartColors.cyan
+                    ],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        callbacks: {
+                            label: function(context) {
+                                if (context.parsed.x > 100000000) {
+                                    return '₩' + (context.parsed.x / 100000000).toFixed(1) + '억';
+                                } else {
+                                    return '₩' + (context.parsed.x / 10000000).toFixed(1) + '천만';
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: chartColors.grid },
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                if (value > 100000000) {
+                                    return '₩' + (value / 100000000).toFixed(0) + '억';
+                                } else {
+                                    return '₩' + (value / 10000000).toFixed(0) + '천만';
+                                }
+                            }
+                        }
+                    },
+                    y: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+        
+        // 테이블 데이터 생성
+        const totalVendorRevenue = Object.values(vendorData).reduce((a, b) => a + b, 0);
+        const vendorTableBody = document.getElementById('vendorTableBody');
+        
+        Object.entries(vendorData)
+            .sort((a, b) => b[1] - a[1])
+            .forEach((item, index) => {
+                const row = document.createElement('tr');
+                const percentage = ((item[1] / totalVendorRevenue) * 100).toFixed(1);
+                const badgeClass = item[0].includes('네이버') ? 'naver' : 
+                                  item[0].includes('쿠팡') ? 'coupang' : 
+                                  item[0].includes('십일번가') ? 'eleven' : '';
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td><span class="vendor-badge ${badgeClass}">${item[0]}</span></td>
+                    <td>₩${(item[1] / 10000000).toFixed(1)}천만</td>
+                    <td>${percentage}%</td>
+                    <td>${percentage > 50 ? '🟢' : percentage > 10 ? '🟡' : '🔴'}</td>
+                `;
+                vendorTableBody.appendChild(row);
+            });
+    </script>
+</body>
+</html>
